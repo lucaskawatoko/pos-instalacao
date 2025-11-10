@@ -150,7 +150,6 @@ function Install-NerdFont {
 
 function Play-ScareSound {
     param(
-        # USANDO O LINK RAW CORRETO DO SEU REPOSITÓRIO
         [string]$Mp3Url = "https://raw.githubusercontent.com/lucaskawatoko/pos-instalacao/main/scream-of-terror-325532.mp3"
     )
 
@@ -160,31 +159,30 @@ function Play-ScareSound {
     
     # 1. Baixa o MP3 e garante que o download terminou
     try {
-        # Adicionamos -UseBasicParsing para compatibilidade e garantimos que o download ocorra
+        Write-Host "   - Baixando áudio..." -NoNewline
         Invoke-WebRequest -Uri $Mp3Url -OutFile $TempPath -ErrorAction Stop -UseBasicParsing
-        Write-Host "   - Áudio baixado com sucesso." -ForegroundColor DarkGray
+        Write-Host " OK." -ForegroundColor DarkGray
     } catch {
-        Write-Warning "❌ Falha ao baixar o arquivo de áudio. Erro: $($_.Exception.Message). Pulando a trolagem sonora."
+        Write-Warning "❌ Falha ao baixar o arquivo de áudio. Pulando a trolagem sonora."
         return
     }
 
-    # 2. Toca o MP3 usando o Windows Media Player COM object
+    # 2. Toca o MP3 usando o reprodutor padrão (WMP, VLC, etc.)
     try {
-        # Define um atraso para garantir que o arquivo esteja pronto e o próximo comando seja não-bloqueante
-        Start-Sleep -Milliseconds 500 
+        Write-Host "   - Tentando iniciar a reprodução (Volume Máximo)..." -ForegroundColor Red
         
-        $WMP = New-Object -ComObject "WMPlayer.OCX"
-        $WMP.settings.volume = 100 # Volume máximo dentro do player
-        $WMP.URL = $TempPath
-        $WMP.Controls().play()
+        # INICIA O PROCESSO DE REPRODUÇÃO EM BACKGROUND
+        # O argumento "-wmp" força o uso do Windows Media Player se estiver instalado.
+        # Alternativa: Start-Process $TempPath (usará o player padrão do sistema)
+        Start-Process $TempPath 
         
         Write-Host "   - Som de terror ativado!" -ForegroundColor Red
 
-        # Damos um pequeno atraso para o som começar antes do terminal fechar/o script prosseguir
-        Start-Sleep -Seconds 3 
+        # Dá um tempo para o áudio começar.
+        Start-Sleep -Seconds 4 
         
     } catch {
-        Write-Warning "❌ Falha ao iniciar a reprodução do áudio (WMP COM). O objeto pode estar indisponível."
+        Write-Warning "❌ Falha crítica ao iniciar o processo de áudio. Verifique se há um reprodutor de MP3."
     }
 }
 
