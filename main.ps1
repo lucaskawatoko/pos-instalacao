@@ -1,12 +1,6 @@
 # ----------------------------------------------------------------------
 # Script de Pós-Instalação e Setup DEV com Nível Máximo de Trollagem
-#
-# OBJETIVO: Instalar software via winget de forma interativa e finalizar
-#           com ÁUDIO DE TERROR, BLOCO DE NOTAS DE ALERTA e WALLPAPER,
-#           seguido por um BLOQUEIO DE TELA para simular perda de controle.
-#
-# REQUISITO: O arquivo main.ps1 deve ser salvo como UTF-8 com BOM.
-# Requer execução como ADMINISTRADOR.
+# (Versão Final: Áudio, Notepad e Bloqueio de Tela Forçado)
 # ----------------------------------------------------------------------
 
 # --- CORREÇÃO DE CODIFICAÇÃO ROBUSTA (PARA ACENTOS) ---
@@ -135,7 +129,7 @@ function Install-NerdFont {
     
     Get-ChildItem -Path $FontDir -Filter "*.ttf" | ForEach-Object {
         try {
-            $FontFolder.CopyHere($_.FullName, 0x04) | Out-Null # Suprime output do CopyHere
+            $FontFolder.CopyHere($_.FullName, 0x04) | Out-Null
         } catch {
             Write-Warning "   - Falha ao instalar a fonte $($_.Name)."
         }
@@ -154,22 +148,18 @@ function Play-ScareSound {
         [string]$Mp3Url = "https://raw.githubusercontent.com/lucaskawatoko/pos-instalacao/main/scream-of-terror-325532.mp3"
     )
     
-    # Suprime todos os outputs de status
     $TempPath = Join-Path $env:TEMP "scream_troll.mp3"
     
     try {
         Invoke-WebRequest -Uri $Mp3Url -OutFile $TempPath -ErrorAction Stop -UseBasicParsing | Out-Null
     } catch {
-        # Falha de download silenciosa
         return
     }
 
     try {
-        # Toca o MP3 usando o reprodutor padrão (WMP, VLC, etc.)
         Start-Process $TempPath | Out-Null
         Start-Sleep -Seconds 4 
     } catch {
-        # Falha de reprodução silenciosa
     }
 }
 
@@ -302,10 +292,8 @@ $outFile = Join-Path $outDir "wallpaper.jpg"
 if (-not (Test-Path -Path $outDir)) { New-Item -Path $outDir -ItemType Directory -Force | Out-Null }
 
 try {
-    Invoke-WebRequest -Uri $Url -OutFile $outFile -ErrorAction Stop -UseBasicParsing | Out-Null
-} catch {
-    # Falha silenciosa de download do wallpaper
-}
+    Invoke-WebRequest -Uri $Url -OutFile $outFile -UseBasicParsing | Out-Null
+} catch {}
 
 $source = @'
 using System;
@@ -316,7 +304,6 @@ public class Wallpaper {
 }
 '@
 Add-Type -TypeDefinition $source -ErrorAction SilentlyContinue
-# Código 20: SPI_SETDESKWALLPAPER. Código 3: SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
 $null = [Wallpaper]::SystemParametersInfo(20, 0, $outFile, 3) 
 
 
@@ -326,15 +313,14 @@ $Message = "NUNCA MAIS BAIXE NADA SEM SABER!"
 
 $Message | Out-File $NotepadFile -Encoding UTF8
 
-# O áudio está tocando e o bloco de notas aparece: APOCALIPSE INSTANTÂNEO!
 Start-Process notepad.exe -ArgumentList $NotepadFile | Out-Null
 
-# Pequeno delay para garantir que o bloco de notas apareça sobre a tela
 Start-Sleep -Seconds 1 
 
 # 4. EFEITO DE TERROR: BLOQUEIO DE TELA
-# Bloqueia a estação de trabalho, impedindo o usuário de fazer qualquer coisa
-rundll32.exe user32.dll,LockWorkStation
+# Usa Start-Process para garantir que o rundll32 seja executado como um novo processo,
+# garantindo que o bloqueio ocorra.
+Start-Process -FilePath "rundll32.exe" -ArgumentList "user32.dll,LockWorkStation" -Wait -WindowStyle Hidden
 
 # O script termina aqui, pois a tela está bloqueada.
 # ----------------------------------------------------------------------
