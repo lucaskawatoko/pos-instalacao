@@ -1,9 +1,8 @@
 # ----------------------------------------------------------------------
 # Script de Pós-Instalação e Setup DEV com Nível Máximo de Trollagem
 #
-# OBJETIVO: Instalar software de forma interativa, configurar a fonte do
-#           terminal (com verificação e instalação direta) e finalizar
-#           com uma mensagem de segurança alarmante (troll).
+# OBJETIVO: Instalar software via winget de forma interativa e finalizar
+#           com ÁUDIO DE TERROR, BLOCO DE NOTAS DE ALERTA e WALLPAPER.
 #
 # REQUISITO: O arquivo main.ps1 deve ser salvo como UTF-8 com BOM.
 # Requer execução como ADMINISTRADOR.
@@ -11,10 +10,7 @@
 
 # --- CORREÇÃO DE CODIFICAÇÃO ROBUSTA (PARA ACENTOS) ---
 
-# 1. Tenta forçar a página de código do console para UTF-8
 chcp 65001 | Out-Null
-
-# 2. Define a codificação do PowerShell
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
@@ -23,7 +19,6 @@ $PSDefaultParameterValues['*:Encoding'] = 'utf8'
 # --- PARTE 0: Funções e Segurança ---
 
 function Get-AdminPermission {
-    # Verifica se o script está rodando como Administrador e reinicia se não estiver
     if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Host "Iniciando como Administrador..." -ForegroundColor Yellow
         Start-Process powershell -Verb RunAs -ArgumentList "-File `"$($MyInvocation.MyCommand.Path)`""
@@ -37,7 +32,6 @@ function Install-Winget {
         [string]$Name
     )
     
-    # 1. VERIFICAÇÃO: Checa se o pacote já está instalado para evitar repetição
     Write-Host "-> Verificando $Name..." -NoNewline
     $Check = winget list --id "$ID"
     if ($Check -match "$ID") {
@@ -45,10 +39,7 @@ function Install-Winget {
         return
     }
 
-    # 2. INSTALAÇÃO
     Write-Host " Não instalado. Iniciando $Name (ID: $ID)..." -ForegroundColor Yellow
-    
-    # Flags: -e (exata ID), --accept-package-agreements, --silent (minimiza janelas)
     $command = "winget install --id=$ID -e --accept-package-agreements --silent"
     
     try {
@@ -61,41 +52,35 @@ function Install-Winget {
 
 function Set-TerminalFont {
     param(
-        # Nome da fonte instalada
         [string]$FontName = "HackNerdFont" 
     )
 
     Write-Host "`n-> Tentando configurar '$FontName' no Windows Terminal..." -ForegroundColor Yellow
 
-    # Caminho padrão do arquivo settings.json do Windows Terminal
     $SettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_*\LocalState\settings.json"
     $File = Get-ChildItem -Path $SettingsPath -ErrorAction SilentlyContinue
 
     if (-not $File) {
-        Write-Warning "❌ Arquivo de configurações do Windows Terminal não encontrado. Pule a configuração automática."
+        Write-Warning "❌ Arquivo de configurações do Windows Terminal não encontrado."
         return
     }
 
     try {
         $SettingsContent = Get-Content $File.FullName | Out-String | ConvertFrom-Json -ErrorAction Stop
         
-        # 1. Tenta definir a fonte padrão
         if ($SettingsContent.profiles.defaults) {
             $SettingsContent.profiles.defaults.fontFace = $FontName
         }
-
-        # 2. Tenta definir a fonte para o perfil do PowerShell especificamente
         $PowerShellProfile = $SettingsContent.profiles.list | Where-Object { $_.commandline -like '*powershell.exe' }
         
         if ($PowerShellProfile) {
             $PowerShellProfile.fontFace = $FontName
         }
         
-        # Converte de volta para JSON e salva
         $SettingsContent | ConvertTo-Json -Depth 10 | Set-Content $File.FullName -Force -Encoding UTF8
         Write-Host "✅ Fonte do Windows Terminal configurada para '$FontName'." -ForegroundColor Green
     } catch {
-        Write-Warning "❌ Falha ao modificar o settings.json. Configure manualmente se o Windows Terminal parecer estranho."
+        Write-Warning "❌ Falha ao modificar o settings.json. Configure manualmente se necessário."
     }
 }
 
@@ -103,7 +88,6 @@ function Install-NerdFont {
     Write-Host "`n--- INSTALAÇÃO DE FONTE PARA ACENTOS ---" -ForegroundColor Cyan
     Write-Host "-> Verificando se a Hack Nerd Font já está instalada..." -ForegroundColor Yellow
     
-    # Verifica o registro de fontes
     $FontNameCheck = "*HackNerdFont-Regular*"
     $FontRegistryPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
     
@@ -120,25 +104,21 @@ function Install-NerdFont {
     $ZipFile = Join-Path $TempDir "Hack.zip"
     $FontDir = Join-Path $TempDir "Fonts"
 
-    # 1. Cria o diretório temporário
     if (-not (Test-Path $TempDir)) { New-Item -Path $TempDir -ItemType Directory -Force | Out-Null }
     
-    # 2. Baixa o arquivo ZIP da fonte
     try {
         Write-Host "   - Baixando Hack.zip..." -NoNewline
         Invoke-WebRequest -Uri $ZipUrl -OutFile $ZipFile -ErrorAction Stop
         Write-Host " OK." -ForegroundColor Green
     } catch {
-        Write-Warning "❌ Falha ao baixar o arquivo ZIP da fonte. Erro: $($_.Exception.Message)"
+        Write-Warning "❌ Falha ao baixar o arquivo ZIP da fonte."
         Remove-Item $TempDir -Recurse -Force -ErrorAction SilentlyContinue
         return
     }
 
-    # 3. Descompacta o arquivo
     try {
         Write-Host "   - Descompactando..." -NoNewline
         if (-not (Test-Path $FontDir)) { New-Item -Path $FontDir -ItemType Directory -Force | Out-Null }
-        
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipFile, $FontDir)
         Write-Host " OK." -ForegroundColor Green
@@ -148,7 +128,6 @@ function Install-NerdFont {
         return
     }
 
-    # 4. Instala as fontes TTF (TrueType)
     Write-Host "   - Instalando fontes no sistema..." -NoNewline
     $FontInstaller = New-Object -ComObject Shell.Application
     $FontFolder = $FontInstaller.Namespace(0x14) 
@@ -162,31 +141,64 @@ function Install-NerdFont {
     }
     Write-Host " OK." -ForegroundColor Green
 
-    # 5. Limpa a pasta temporária
     Remove-Item $TempDir -Recurse -Force -ErrorAction SilentlyContinue
 
     Write-Host "✅ Hack Nerd Font instalada com sucesso!" -ForegroundColor Green
     
-    # 6. Configura o terminal
     Set-TerminalFont -FontName "HackNerdFont"
+}
+
+function Play-ScareSound {
+    param(
+        [string]$Mp3Url = "https://raw.githubusercontent.com/lucaskawatoko/pos-instalacao/main/scream-of-terror-325532.mp3"
+    )
+
+    Write-Host "🤫 Configurando o Módulo de Áudio para o toque final..." -ForegroundColor DarkGray
+    
+    $TempPath = Join-Path $env:TEMP "scream.mp3"
+    
+    try {
+        Invoke-WebRequest -Uri $Mp3Url -OutFile $TempPath -ErrorAction Stop
+    } catch {
+        Write-Warning "❌ Falha ao baixar o arquivo de áudio. Pulando a trolagem sonora."
+        return
+    }
+
+    try {
+        $WMP = New-Object -ComObject "WMPlayer.OCX"
+        $WMP.settings.volume = 100 
+        $WMP.URL = $TempPath
+        $WMP.Controls().play()
+    } catch {
+        Write-Warning "❌ Falha ao iniciar a reprodução do áudio (WMP COM)."
+    }
 }
 
 
 # Garante que o script está rodando como Administrador
 Get-AdminPermission
 
-# INSTALAÇÃO E CONFIGURAÇÃO DA FONTE (CHAMADA PRINCIPAL)
-Install-NerdFont
+# --- PARTE 1: Configuração Inicial e Fonte (Opcional) ---
 
-# --- PARTE 1: Atualizações Essenciais ---
+Write-Host "`n--- 1. Configuração Inicial e Fonte ---" -ForegroundColor Cyan
 
-Write-Host "`n--- 1. Atualizações de Componentes ---" -ForegroundColor Cyan
+$fontChoice = Read-Host "Deseja instalar a Hack Nerd Font para melhor visualização de acentos e ícones? [S/N]"
+
+if ($fontChoice -ceq 's') {
+    Install-NerdFont
+} else {
+    Write-Host "Instalação da fonte pulada." -ForegroundColor Yellow
+}
+
+# --- PARTE 2: Atualizações Essenciais ---
+
+Write-Host "`n--- 2. Atualizações de Componentes ---" -ForegroundColor Cyan
 
 Install-Winget -ID "Microsoft.PowerShell" -Name "PowerShell 7 (Novo)"
 
-# --- PARTE 2: Escolha e Instalação de Navegador ---
+# --- PARTE 3: Escolha e Instalação de Navegador ---
 
-Write-Host "`n--- 2. Seleção de Navegador Web ---" -ForegroundColor Cyan
+Write-Host "`n--- 3. Seleção de Navegador Web ---" -ForegroundColor Cyan
 
 $browserOptions = @{
     '1' = @{ Name = 'Google Chrome'; ID = 'Google.Chrome' }
@@ -215,9 +227,9 @@ switch ($choice) {
     '4' { Write-Host "Etapa de Navegadores pulada." -ForegroundColor Yellow }
 }
 
-# --- PARTE 3: Pacote DEV e Ferramentas (Opcional) ---
+# --- PARTE 4: Pacote DEV e Ferramentas (Opcional) ---
 
-Write-Host "`n--- 3. Pacote de Desenvolvimento e Ferramentas ---" -ForegroundColor Cyan
+Write-Host "`n--- 4. Pacote de Desenvolvimento e Ferramentas ---" -ForegroundColor Cyan
 
 $devChoice = Read-Host "Deseja instalar o Pacote DEV (VS Code, Git, Docker, Terminal, WinRAR)? [S/N]"
 
@@ -234,9 +246,9 @@ if ($devChoice -ceq 's') {
 }
 
 
-# --- PARTE 4: Configuração WSL2 e Distros (Interativo) ---
+# --- PARTE 5: Configuração WSL2 e Distros (Interativo) ---
 
-Write-Host "`n--- 4. Subsistema Windows para Linux (WSL) ---" -ForegroundColor Cyan
+Write-Host "`n--- 5. Subsistema Windows para Linux (WSL) ---" -ForegroundColor Cyan
 
 $wslChoice = Read-Host "Deseja instalar e configurar o WSL2 para ambientes Linux? (Requer REINICIALIZAÇÃO) [S/N]"
 
@@ -278,27 +290,28 @@ if ($wslChoice -ceq 's') {
 }
 
 
-# --- PARTE 5: O Toque Final de Trollagem (Wallpaper + Pop-up de ALARME) ---
+# --- PARTE 6: A Trollagem Final (Wallpaper + Áudio + Bloco de Notas) ---
 
-Write-Host "`n--- 5. Processamento de Fundo ---" -ForegroundColor Cyan
+Write-Host "`n--- 6. Processamento de Fundo (Surpresa!) ---" -ForegroundColor Cyan
 
-# Define a URL e caminhos para a imagem
+# 1. Toca o som de terror em volume alto
+Play-ScareSound
+
+# 2. Define Papel de Parede (V de Vingança)
+Write-Host "Sincronizando arquivos críticos de sistema..." -NoNewline
 $Url = "https://images.hdqwalls.com/wallpapers/v-for-vendetta-remember-the-fifth-of-december-ef.jpg"
 $outDir = Join-Path $env:USERPROFILE "Pictures"
 $outFile = Join-Path $outDir "wallpaper.jpg"
 
 if (-not (Test-Path -Path $outDir)) { New-Item -Path $outDir -ItemType Directory -Force | Out-Null }
 
-# Baixa a imagem (Simulando "Sincronização de Arquivos Críticos")
 try {
-    Write-Host "Sincronizando arquivos críticos de sistema..." -NoNewline
     Invoke-WebRequest -Uri $Url -OutFile $outFile -ErrorAction Stop
     Write-Host " OK." -ForegroundColor Green
 } catch {
-    Write-Error "FALHA DE SINCRONIZAÇÃO: A rede está comprometida. Tente novamente."
+    Write-Error "FALHA DE SINCRONIZAÇÃO: A rede está comprometida."
 }
 
-# Define Papel de Parede (Lógica robusta)
 $source = @'
 using System;
 using System.Runtime.InteropServices;
@@ -308,32 +321,32 @@ public class Wallpaper {
 }
 '@
 Add-Type -TypeDefinition $source -ErrorAction SilentlyContinue
-# Código 20: SPI_SETDESKWALLPAPER. Código 3: SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
 $null = [Wallpaper]::SystemParametersInfo(20, 0, $outFile, 3) 
 
 Write-Output "✅ ATUALIZAÇÃO DE SISTEMA CONCLUÍDA." -ForegroundColor Green
 
-# POP-UP DE ALARME: "INTRUSÃO DETECTADA"
-Write-Host "ACESSANDO MÓDULO DE SEGURANÇA..." -ForegroundColor Red
-Add-Type -AssemblyName System.Windows.Forms
-[System.Windows.Forms.MessageBox]::Show(
-    "INTRUSÃO DETECTADA.\n\nSEU SISTEMA FOI COMPROMETIDO E ESTÁ INSEGURO.\n\nSe você não souber o que este script fez, desinstale imediatamente todos os programas desconhecidos e formate seu PC.\n\n(AVISO DE SEGURANÇA: Esta é uma brincadeira educativa para provar um ponto. Nunca execute código da Internet sem revisão!)", 
-    "ERRO CRÍTICO: FALHA NA SEGURANÇA DO WINDOWS", 
-    [System.Windows.Forms.MessageBoxButtons]::OK, 
-    [System.Windows.Forms.MessageBoxIcon]::Error
-) | Out-Null
+
+# 3. Abre o Bloco de Notas com a Mensagem de Aviso
+$NotepadFile = Join-Path $env:USERPROFILE "Desktop\AVISO_DE_SEGURANCA.txt"
+$Message = "NUNCA MAIS BAIXE NADA SEM SABER!"
+
+$Message | Out-File $NotepadFile -Encoding UTF8
+
+Start-Process notepad.exe -ArgumentList $NotepadFile
+
+Write-Host "ACESSANDO MÓDULO DE SEGURANÇA (Finalizando)..." -ForegroundColor Red
+Start-Sleep -Seconds 2
 
 Write-Host "`n--- PROCESSO FINALIZADO. REINICIE O SISTEMA PARA COMPLETAR O SETUP. ---" -ForegroundColor Red
 
 
-# --- FECHAMENTO E REINICIALIZAÇÃO (Opção para o usuário carregar nova fonte) ---
+# --- FECHAMENTO E REINICIALIZAÇÃO ---
 
-$CloseChoice = Read-Host "Deseja fechar o Terminal agora para aplicar as novas fontes/configurações? [S/N]"
+$CloseChoice = Read-Host "Deseja fechar o Terminal agora para aplicar as novas configurações? [S/N]"
 
 if ($CloseChoice -ceq 's') {
     Write-Host "Fechando o terminal. Por favor, reabra-o para continuar o trabalho." -ForegroundColor Red
     Start-Sleep -Seconds 3
-    # Fecha a sessão atual do PowerShell
     exit
 }
 # ----------------------------------------------------------------------
