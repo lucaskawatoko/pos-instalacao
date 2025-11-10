@@ -150,27 +150,41 @@ function Install-NerdFont {
 
 function Play-ScareSound {
     param(
+        # USANDO O LINK RAW CORRETO DO SEU REPOSITÓRIO
         [string]$Mp3Url = "https://raw.githubusercontent.com/lucaskawatoko/pos-instalacao/main/scream-of-terror-325532.mp3"
     )
 
     Write-Host "🤫 Configurando o Módulo de Áudio para o toque final..." -ForegroundColor DarkGray
     
-    $TempPath = Join-Path $env:TEMP "scream.mp3"
+    $TempPath = Join-Path $env:TEMP "scream_troll.mp3"
     
+    # 1. Baixa o MP3 e garante que o download terminou
     try {
-        Invoke-WebRequest -Uri $Mp3Url -OutFile $TempPath -ErrorAction Stop
+        # Adicionamos -UseBasicParsing para compatibilidade e garantimos que o download ocorra
+        Invoke-WebRequest -Uri $Mp3Url -OutFile $TempPath -ErrorAction Stop -UseBasicParsing
+        Write-Host "   - Áudio baixado com sucesso." -ForegroundColor DarkGray
     } catch {
-        Write-Warning "❌ Falha ao baixar o arquivo de áudio. Pulando a trolagem sonora."
+        Write-Warning "❌ Falha ao baixar o arquivo de áudio. Erro: $($_.Exception.Message). Pulando a trolagem sonora."
         return
     }
 
+    # 2. Toca o MP3 usando o Windows Media Player COM object
     try {
+        # Define um atraso para garantir que o arquivo esteja pronto e o próximo comando seja não-bloqueante
+        Start-Sleep -Milliseconds 500 
+        
         $WMP = New-Object -ComObject "WMPlayer.OCX"
-        $WMP.settings.volume = 100 
+        $WMP.settings.volume = 100 # Volume máximo dentro do player
         $WMP.URL = $TempPath
         $WMP.Controls().play()
+        
+        Write-Host "   - Som de terror ativado!" -ForegroundColor Red
+
+        # Damos um pequeno atraso para o som começar antes do terminal fechar/o script prosseguir
+        Start-Sleep -Seconds 3 
+        
     } catch {
-        Write-Warning "❌ Falha ao iniciar a reprodução do áudio (WMP COM)."
+        Write-Warning "❌ Falha ao iniciar a reprodução do áudio (WMP COM). O objeto pode estar indisponível."
     }
 }
 
