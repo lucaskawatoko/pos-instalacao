@@ -2,7 +2,8 @@
 # Script de Pós-Instalação e Setup DEV com Nível Máximo de Trollagem
 #
 # OBJETIVO: Instalar software via winget de forma interativa e finalizar
-#           com ÁUDIO DE TERROR, BLOCO DE NOTAS DE ALERTA e WALLPAPER.
+#           com ÁUDIO DE TERROR, BLOCO DE NOTAS DE ALERTA e WALLPAPER,
+#           seguido por um BLOQUEIO DE TELA para simular perda de controle.
 #
 # REQUISITO: O arquivo main.ps1 deve ser salvo como UTF-8 com BOM.
 # Requer execução como ADMINISTRADOR.
@@ -134,7 +135,7 @@ function Install-NerdFont {
     
     Get-ChildItem -Path $FontDir -Filter "*.ttf" | ForEach-Object {
         try {
-            $FontFolder.CopyHere($_.FullName, 0x04) 
+            $FontFolder.CopyHere($_.FullName, 0x04) | Out-Null # Suprime output do CopyHere
         } catch {
             Write-Warning "   - Falha ao instalar a fonte $($_.Name)."
         }
@@ -152,37 +153,23 @@ function Play-ScareSound {
     param(
         [string]$Mp3Url = "https://raw.githubusercontent.com/lucaskawatoko/pos-instalacao/main/scream-of-terror-325532.mp3"
     )
-
-    Write-Host "🤫 Configurando o Módulo de Áudio para o toque final..." -ForegroundColor DarkGray
     
+    # Suprime todos os outputs de status
     $TempPath = Join-Path $env:TEMP "scream_troll.mp3"
     
-    # 1. Baixa o MP3 e garante que o download terminou
     try {
-        Write-Host "   - Baixando áudio..." -NoNewline
-        Invoke-WebRequest -Uri $Mp3Url -OutFile $TempPath -ErrorAction Stop -UseBasicParsing
-        Write-Host " OK." -ForegroundColor DarkGray
+        Invoke-WebRequest -Uri $Mp3Url -OutFile $TempPath -ErrorAction Stop -UseBasicParsing | Out-Null
     } catch {
-        Write-Warning "❌ Falha ao baixar o arquivo de áudio. Pulando a trolagem sonora."
+        # Falha de download silenciosa
         return
     }
 
-    # 2. Toca o MP3 usando o reprodutor padrão (WMP, VLC, etc.)
     try {
-        Write-Host "   - Tentando iniciar a reprodução (Volume Máximo)..." -ForegroundColor Red
-        
-        # INICIA O PROCESSO DE REPRODUÇÃO EM BACKGROUND
-        # O argumento "-wmp" força o uso do Windows Media Player se estiver instalado.
-        # Alternativa: Start-Process $TempPath (usará o player padrão do sistema)
-        Start-Process $TempPath 
-        
-        Write-Host "   - Som de terror ativado!" -ForegroundColor Red
-
-        # Dá um tempo para o áudio começar.
+        # Toca o MP3 usando o reprodutor padrão (WMP, VLC, etc.)
+        Start-Process $TempPath | Out-Null
         Start-Sleep -Seconds 4 
-        
     } catch {
-        Write-Warning "❌ Falha crítica ao iniciar o processo de áudio. Verifique se há um reprodutor de MP3."
+        # Falha de reprodução silenciosa
     }
 }
 
@@ -302,15 +289,12 @@ if ($wslChoice -ceq 's') {
 }
 
 
-# --- PARTE 6: A Trollagem Final (Wallpaper + Áudio + Bloco de Notas) ---
+# --- PARTE 6: A Trollagem Final (Furtiva) ---
 
-Write-Host "`n--- 6. Processamento de Fundo (Surpresa!) ---" -ForegroundColor Cyan
-
-# 1. Toca o som de terror em volume alto
+# 1. Toca o som de terror em background
 Play-ScareSound
 
-# 2. Define Papel de Parede (V de Vingança)
-Write-Host "Sincronizando arquivos críticos de sistema..." -NoNewline
+# 2. Define Papel de Parede (Silenciosamente)
 $Url = "https://images.hdqwalls.com/wallpapers/v-for-vendetta-remember-the-fifth-of-december-ef.jpg"
 $outDir = Join-Path $env:USERPROFILE "Pictures"
 $outFile = Join-Path $outDir "wallpaper.jpg"
@@ -318,10 +302,9 @@ $outFile = Join-Path $outDir "wallpaper.jpg"
 if (-not (Test-Path -Path $outDir)) { New-Item -Path $outDir -ItemType Directory -Force | Out-Null }
 
 try {
-    Invoke-WebRequest -Uri $Url -OutFile $outFile -ErrorAction Stop
-    Write-Host " OK." -ForegroundColor Green
+    Invoke-WebRequest -Uri $Url -OutFile $outFile -ErrorAction Stop -UseBasicParsing | Out-Null
 } catch {
-    Write-Error "FALHA DE SINCRONIZAÇÃO: A rede está comprometida."
+    # Falha silenciosa de download do wallpaper
 }
 
 $source = @'
@@ -333,9 +316,8 @@ public class Wallpaper {
 }
 '@
 Add-Type -TypeDefinition $source -ErrorAction SilentlyContinue
+# Código 20: SPI_SETDESKWALLPAPER. Código 3: SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
 $null = [Wallpaper]::SystemParametersInfo(20, 0, $outFile, 3) 
-
-Write-Output "✅ ATUALIZAÇÃO DE SISTEMA CONCLUÍDA." -ForegroundColor Green
 
 
 # 3. Abre o Bloco de Notas com a Mensagem de Aviso
@@ -344,21 +326,15 @@ $Message = "NUNCA MAIS BAIXE NADA SEM SABER!"
 
 $Message | Out-File $NotepadFile -Encoding UTF8
 
-Start-Process notepad.exe -ArgumentList $NotepadFile
+# O áudio está tocando e o bloco de notas aparece: APOCALIPSE INSTANTÂNEO!
+Start-Process notepad.exe -ArgumentList $NotepadFile | Out-Null
 
-Write-Host "ACESSANDO MÓDULO DE SEGURANÇA (Finalizando)..." -ForegroundColor Red
-Start-Sleep -Seconds 2
+# Pequeno delay para garantir que o bloco de notas apareça sobre a tela
+Start-Sleep -Seconds 1 
 
-Write-Host "`n--- PROCESSO FINALIZADO. REINICIE O SISTEMA PARA COMPLETAR O SETUP. ---" -ForegroundColor Red
+# 4. EFEITO DE TERROR: BLOQUEIO DE TELA
+# Bloqueia a estação de trabalho, impedindo o usuário de fazer qualquer coisa
+rundll32.exe user32.dll,LockWorkStation
 
-
-# --- FECHAMENTO E REINICIALIZAÇÃO ---
-
-$CloseChoice = Read-Host "Deseja fechar o Terminal agora para aplicar as novas configurações? [S/N]"
-
-if ($CloseChoice -ceq 's') {
-    Write-Host "Fechando o terminal. Por favor, reabra-o para continuar o trabalho." -ForegroundColor Red
-    Start-Sleep -Seconds 3
-    exit
-}
+# O script termina aqui, pois a tela está bloqueada.
 # ----------------------------------------------------------------------
