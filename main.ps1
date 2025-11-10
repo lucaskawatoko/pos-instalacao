@@ -8,12 +8,15 @@
 # ----------------------------------------------------------------------
 
 # --- CORREÇÃO DE CODIFICAÇÃO ROBUSTA (PARA ACENTOS) ---
-# Força o uso de UTF-8 para exibição correta dos caracteres na console
+
+# 1. Tenta forçar a página de código do console para UTF-8 (CRÍTICO para consoles antigos)
+chcp 65001 | Out-Null
+
+# 2. Define a codificação do PowerShell (mais abrangente)
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
 $PSDefaultParameterValues['*:Encoding'] = 'utf8'
-
 
 # --- PARTE 0: Funções e Segurança ---
 
@@ -37,6 +40,7 @@ function Install-Winget {
     
     # 1. VERIFICAÇÃO: Checa se o pacote já está instalado para evitar repetição
     Write-Host "-> Verificando $Name..." -NoNewline
+    # Nota: A saída de winget list pode falhar a codificação se o console não estiver 100% UTF-8.
     $Check = winget list --id "$ID"
     if ($Check -match "$ID") {
         Write-Host " Já instalado. Pulando." -ForegroundColor DarkYellow
