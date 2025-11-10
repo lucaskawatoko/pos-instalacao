@@ -1,35 +1,42 @@
-# main.ps1 - Altera o papel de parede para a imagem fornecida
-# URL: https://images.hdqwalls.com/wallpapers/v-for-vendetta-remember-the-fifth-of-december-ef.jpg
+## 💻 Script para Definir Papel de Parede (Apenas Windows)
 
 param(
     [string]$Url = "https://images.hdqwalls.com/wallpapers/v-for-vendetta-remember-the-fifth-of-december-ef.jpg"
 )
 
-# Determina caminhos conforme SO
-if ($IsWindows) {
-    $outDir = Join-Path $env:USERPROFILE "Pictures"
-    $outFile = Join-Path $outDir "wallpaper.jpg"
-} else {
-    $outDir = Join-Path $env:HOME ".local/share/backgrounds"
-    $outFile = Join-Path $outDir "wallpaper.jpg"
-}
+# --- 1. Determina Caminhos no Windows ---
 
-# Cria diretório se necessário
+# Define o diretório de destino (Geralmente C:\Users\<SeuUsuario>\Pictures)
+$outDir = Join-Path $env:USERPROFILE "Pictures"
+# Define o nome e caminho completo do arquivo
+$outFile = Join-Path $outDir "wallpaper.jpg"
+
+
+# --- 2. Cria Diretório se Necessário ---
+
 if (-not (Test-Path -Path $outDir)) {
+    Write-Output "Criando diretório: $outDir"
     New-Item -Path $outDir -ItemType Directory -Force | Out-Null
 }
 
-# Baixa a imagem
+
+# --- 3. Baixa a Imagem ---
+
+Write-Output "Baixando imagem de: $Url"
 try {
+    # -ErrorAction Stop garante que a execução pare em caso de falha no download
     Invoke-WebRequest -Uri $Url -OutFile $outFile -ErrorAction Stop
+    Write-Output "Imagem baixada com sucesso em: $outFile"
 } catch {
     Write-Error "Falha ao baixar a imagem: $($_.Exception.Message)"
     exit 1
 }
 
-# Define papel de parede conforme plataforma
-if ($IsWindows) {
-    $source = @'
+
+# --- 4. Define Papel de Parede (Windows) ---
+
+# Adiciona a classe necessária para chamar a API do Windows
+$source = @'
 using System;
 using System.Runtime.InteropServices;
 public class Wallpaper {
@@ -37,38 +44,26 @@ public class Wallpaper {
     public static extern bool SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
 }
 '@
-    Add-Type -TypeDefinition $source -ErrorAction Stop
-    $result = [Wallpaper]::SystemParametersInfo(20, 0, $outFile, 3)
-    if ($result) {
-        Write-Output "Papel de parede definido: $outFile"
-        exit 0
-    } else {
-        Write-Warning "Falha ao aplicar papel de parede via SystemParametersInfo."
-        # Tentativa alternativa
-        Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -Value $outFile -ErrorAction SilentlyContinue
+Add-Type -TypeDefinition $source -ErrorAction Stop
+
+# Tenta usar SystemParametersInfo (código 20 = SPI_SETDESKWALLPAPER)
+$result = [Wallpaper]::SystemParametersInfo(20, 0, $outFile, 3) # 3 = SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
+
+if ($result) {
+    Write-Output "✅ Papel de parede definido com sucesso: $outFile"
+    exit 0
+} else {
+    Write-Warning "Falha ao aplicar papel de parede via SystemParametersInfo. Tentando alternativa..."
+    
+    # Tentativa alternativa via Registro e atualização forçada
+    # (Funciona melhor em algumas versões ou ambientes virtuais)
+    try {
+        Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -Value $outFile -ErrorAction Stop
         Start-Process -FilePath "RUNDLL32.EXE" -ArgumentList "user32.dll,UpdatePerUserSystemParameters" -NoNewWindow
-        Write-Output "Tentou atualizar via registro."
+        Write-Output "Tentou atualizar via registro. Por favor, verifique sua área de trabalho."
         exit 0
-    }
-} elseif ($IsLinux) {
-    # Tenta GNOME (gsettings) ou feh como fallback
-    if (Get-Command gsettings -ErrorAction SilentlyContinue) {
-        $uri = "file://$outFile"
-        & gsettings set org.gnome.desktop.background picture-uri "$uri" 2>$null
-        & gsettings set org.gnome.desktop.background picture-options "scaled" 2>$null
-        Write-Output "Papel de parede definido via gsettings: $outFile"
-        exit 0
-    } elseif (Get-Command feh -ErrorAction SilentlyContinue) {
-        & feh --bg-scale $outFile
-        Write-Output "Papel de parede definido via feh: $outFile"
-        exit 0
-    } else {
-        Write-Warning "Não foi possível aplicar o papel de parede automaticamente. Instale gsettings (GNOME) ou feh."
-        Write-Output "Imagem baixada em: $outFile"
+    } catch {
+        Write-Error "Falha na tentativa de atualização alternativa via registro: $($_.Exception.Message)"
         exit 1
     }
-} else {
-    Write-Warning "Sistema operativo não suportado por este script."
-    Write-Output "Imagem baixada em: $outFile"
-    exit 1
 }
