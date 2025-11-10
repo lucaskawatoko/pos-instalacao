@@ -1,8 +1,9 @@
 # ----------------------------------------------------------------------
 # Script de Pós-Instalação e Setup DEV com Nível Máximo de Trollagem
 #
-# OBJETIVO: Instalar software via winget de forma interativa e finalizar
-#           com uma mensagem de segurança alarmante (troll).
+# OBJETIVO: Instalar software via winget de forma interativa, configurar
+#           a fonte do terminal (para acentos) e finalizar com uma
+#           mensagem de segurança alarmante (troll).
 #
 # Requer execução como ADMINISTRADOR.
 # ----------------------------------------------------------------------
@@ -28,9 +29,6 @@ function Get-AdminPermission {
         exit
     }
 }
-
-# Garante que o script está rodando como Administrador
-Get-AdminPermission
 
 function Install-Winget {
     param(
@@ -61,6 +59,67 @@ function Install-Winget {
         Write-Warning "❌ Falha ao instalar $Name. Verifique a instalação do winget."
     }
 }
+
+function Install-NerdFont {
+    Write-Host "`n-> Instalando Hack Nerd Font para melhor suporte a caracteres e ícones..." -ForegroundColor Yellow
+    
+    # Winget ID para a Hack Nerd Font
+    $FontID = "Ryano.HackNF" 
+    
+    # Reusa a função Install-Winget para o pacote da fonte
+    Install-Winget -ID $FontID -Name "Hack Nerd Font"
+    
+    Write-Host "✅ Instalação da fonte concluída. Tentando configurar o terminal..." -ForegroundColor Green
+}
+
+function Set-TerminalFont {
+    param(
+        [string]$FontName = "Hack Nerd Font"
+    )
+
+    Write-Host "`n-> Tentando configurar '$FontName' no Windows Terminal..." -ForegroundColor Yellow
+
+    # Caminho padrão do arquivo settings.json do Windows Terminal
+    $SettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_*\LocalState\settings.json"
+    
+    # Encontra o caminho real, que pode variar pelo ID do pacote
+    $File = Get-ChildItem -Path $SettingsPath -ErrorAction SilentlyContinue
+
+    if (-not $File) {
+        Write-Warning "❌ Arquivo de configurações do Windows Terminal não encontrado. Pule a configuração automática."
+        return
+    }
+
+    try {
+        # Lê e parseia o JSON
+        $SettingsContent = Get-Content $File.FullName | Out-String | ConvertFrom-Json -ErrorAction Stop
+        
+        # Tenta definir a fonte padrão
+        if ($SettingsContent.profiles.defaults) {
+            $SettingsContent.profiles.defaults.fontFace = $FontName
+        }
+
+        # Tenta definir a fonte para o perfil do PowerShell especificamente
+        $PowerShellProfile = $SettingsContent.profiles.list | Where-Object { $_.commandline -like '*powershell.exe' }
+        
+        if ($PowerShellProfile) {
+            $PowerShellProfile.fontFace = $FontName
+        }
+        
+        # Converte de volta para JSON e salva
+        $SettingsContent | ConvertTo-Json -Depth 10 | Set-Content $File.FullName -Force -Encoding UTF8
+        Write-Host "✅ Fonte do Windows Terminal configurada para '$FontName'." -ForegroundColor Green
+    } catch {
+        Write-Warning "❌ Falha ao modificar o settings.json. Configure manualmente se o Windows Terminal parecer estranho."
+    }
+}
+
+# Garante que o script está rodando como Administrador
+Get-AdminPermission
+
+# INSTALAÇÃO E CONFIGURAÇÃO DA FONTE PARA RESOLVER ACENTOS
+Install-NerdFont
+Set-TerminalFont
 
 # --- PARTE 1: Atualizações Essenciais ---
 
